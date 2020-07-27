@@ -1,28 +1,43 @@
 package com.example.mapNeshan
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
+import android.location.Location
 import android.os.Build
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.databinding.DataBindingUtil
 import com.example.mapNeshan.databinding.ActivityMainBinding
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
-import org.neshan.core.Bounds
 import org.neshan.core.LngLat
 import org.neshan.core.Range
 import org.neshan.layers.VectorElementLayer
 import org.neshan.services.NeshanMapStyle
 import org.neshan.services.NeshanServices
+import org.neshan.styles.AnimationStyleBuilder
+import org.neshan.styles.AnimationType
+import org.neshan.styles.MarkerStyleCreator
+import org.neshan.utils.BitmapUtils
+import org.neshan.vectorelements.Marker
+
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
-    private lateinit var makerLayer: VectorElementLayer
+    private lateinit var markerLayer: VectorElementLayer
     private lateinit var fusedLocationClient: FusedLocationProviderClient
-    private val BASE_MAP_INDEX = 0
     private val REQUEST_PERMISSIONS_REQUEST_CODE = 1000
+    private lateinit var location: Location
+    private lateinit var marker: Marker
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -30,24 +45,75 @@ class MainActivity : AppCompatActivity() {
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         getLocationPermission()
         initMap()
+        binding.fab.setOnClickListener({
+            getLastLocation()
+        })
     }
 
     private fun initMap() {
-        makerLayer = NeshanServices.createVectorElementLayer()
-        binding.map.layers.add(makerLayer)
+        markerLayer = NeshanServices.createVectorElementLayer()
+        binding.map.layers.add(markerLayer)
         binding.map.setFocalPointPosition(LngLat(53.529929, 35.164676), 1f)
         binding.map.setZoom(4.5f, 1f)
         binding.map.options.setZoomRange(Range(4.5f, 18f))
         binding.map.getLayers().add(NeshanServices.createBaseMap(NeshanMapStyle.STANDARD_DAY));
-        //setMapBounds()
+
     }
 
-    private fun setMapBounds() {
-        val bounds = Bounds(
-            LngLat(43.505859, 24.647017),
-            LngLat(63.984375, 40.178873)
+
+    @SuppressLint("MissingPermission")
+    private fun getLastLocation() {
+        fusedLocationClient.lastLocation
+            .addOnCompleteListener(this) { task ->
+                if (task.isSuccessful && task.result != null) {
+                    onLocationChange(task.result)
+                } else {
+                    Toast.makeText(this, "موقعیت یافت نشد.", Toast.LENGTH_SHORT).show()
+                }
+            }
+    }
+
+    private fun LngLat.focus() {
+        binding.map.setZoom(17f, 1f)
+        binding.map.setFocalPointPosition(
+            this,
+            1f
         )
-        binding.map.options.setPanBounds(bounds)
+    }
+
+    private fun onLocationChange(location: Location) {
+        val loc: LngLat = LngLat(location.longitude, location.latitude)
+        loc.focus()
+        setMarker(loc)
+    }
+
+    private fun setMarker(markerLocation: LngLat) {
+        markerLayer.clear()
+
+        val animSt = AnimationStyleBuilder()
+            .let {
+                it.fadeAnimationType = AnimationType.ANIMATION_TYPE_SMOOTHSTEP
+                it.sizeAnimationType = AnimationType.ANIMATION_TYPE_SPRING
+                it.phaseInDuration = 0.5f
+                it.phaseOutDuration = 0.5f
+                it.buildStyle()
+            }
+
+        val st = MarkerStyleCreator()
+            .let {
+                it.size = 48f
+               /* val drawable: Drawable? =
+                    ContextCompat.getDrawable(baseContext, R.drawable.ic_baseline_location_on_24)
+                val bitmap = drawable as BitmapFactory
+                it.bitmap = BitmapUtils.createBitmapFromAndroidBitmap(
+                    BitmapFactory.decodeResource(resources, R.drawable.ic_baseline_location_on_24)
+                )*/
+                it.animationStyle = animSt
+                it.buildStyle()
+            }
+
+        marker = Marker(markerLocation, st)
+        markerLayer.add(marker)
     }
 
 
@@ -80,4 +146,5 @@ class MainActivity : AppCompatActivity() {
         }
 
     }
+
 }
